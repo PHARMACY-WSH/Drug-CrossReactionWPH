@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบคัดกรองการแพ้ยาซ้ำและแพ้ยาข้ามกลุ่ม - โรงพยาบาลวังสะพุง</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Sarabun) -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+        }
+        .header-box {
+            background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+            color: white;
+            padding: 2rem 1rem;
+            border-radius: 0 0 15px 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .card-custom {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            margin-bottom: 1.5rem;
+            background: white;
+        }
+        .badge-hosp-yes {
+            background-color: #198754;
+            color: white;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+        .badge-hosp-no {
+            background-color: #6c757d;
+            color: white;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+        .result-lock-box {
+            border-left: 5px solid #dc3545;
+            background-color: #fff5f5;
+            padding: 1.25rem;
+            border-radius: 8px;
+        }
+        .shortcut-btn {
+            margin: 0.2rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+        #searchResults {
+            background: white;
+            border: 1px solid #ced4da;
+            border-radius: 0 0 8px 8px;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            .header-box { background: none; color: black; padding: 0; box-shadow: none; }
+            body { background-color: white; }
+            .card-custom { box-shadow: none; border: 1px solid #ccc; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid px-0 mb-4 no-print">
+    <div class="header-box text-center">
+        <h2><i class="fa-solid fa-shield-virus me-2"></i>ระบบป้องกันการแพ้ยาซ้ำ และป้องกันการแพ้ยาข้ามกลุ่ม</h2>
+        <p class="mb-0 opacity-75">โรงพยาบาลวังสะพุง อำเภอวังสะพุง จังหวัดเลย</p>
+    </div>
+</div>
+
+<div class="container">
+    <!-- Quick Shortcuts -->
+    <div class="card card-custom p-3 no-print">
+        <h6 class="fw-bold text-primary mb-2"><i class="fa-solid fa-bolt me-1"></i> ทางลัดกรณีผู้ป่วยแจ้งแพ้ยายอดนิยม:</h6>
+        <div>
+            <button class="btn btn-outline-primary shortcut-btn" onclick="quickSelect('Amoxicillin')">Amoxicillin / Penicillin V</button>
+            <button class="btn btn-outline-primary shortcut-btn" onclick="quickSelect('Ceftriaxone')">Ceftriaxone</button>
+            <button class="btn btn-outline-primary shortcut-btn" onclick="quickSelect('Cefazolin')">Cefazolin</button>
+            <button class="btn btn-outline-primary shortcut-btn" onclick="quickSelect('Sulfamethoxazole')">Co-trimoxazole (Bactrim)</button>
+            <button class="btn btn-outline-primary shortcut-btn" onclick="quickSelect('Ibuprofen')">Ibuprofen / NSAIDs</button>
+            <button class="btn btn-outline-primary shortcut-btn" onclick="quickSelect('Tramadol')">Tramadol / Opioids</button>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Input Section -->
+        <div class="col-md-5 no-print">
+            <div class="card card-custom p-4">
+                <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-stethoscope me-2"></i>1. ค้นหาตัวยาและระบุอาการ</h5>
+                
+                <!-- Search Drug -->
+                <div class="mb-3 position-relative">
+                    <label class="form-label fw-semibold">ระบุชื่อยา หรือกลุ่มยาที่ต้องการค้นหา/ประเมิน:</label>
+                    <input type="text" id="drugSearch" class="form-control" placeholder="พิมพ์ชื่อยา เช่น diclo, amox, ceftri..." oninput="searchDrugs(this.value)">
+                    <div id="searchResults" class="list-group position-absolute w-100 shadow-sm" style="z-index: 1000; max-height: 280px; overflow-y: auto;"></div>
+                </div>
+
+                <div id="selectedDrugInfo" class="alert alert-info d-none">
+                    <div class="fw-bold d-flex justify-content-between align-items-center mb-1" id="selectedDrugTitle">
+                        <span>-</span>
+                    </div>
+                    <div class="small text-muted" id="selectedDrugDetail"></div>
+                </div>
+
+                <!-- Severity Level -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">ระดับความรุนแรงของอาการแพ้:</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="severity" id="sevNonSevere" value="non-severe" checked onchange="calculateLocking()">
+                        <label class="form-check-label text-success fw-medium" for="sevNonSevere">
+                            <i class="fa-solid fa-circle-check me-1"></i> อาการไม่รุนแรง (Non-severe)
+                            <div class="text-muted small">เช่น Pruritus, MP rash, Urticaria, Acneiform rash</div>
+                        </label>
+                    </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="radio" name="severity" id="sevSevere" value="severe" onchange="calculateLocking()">
+                        <label class="form-check-label text-danger fw-medium" for="sevSevere">
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i> อาการรุนแรง (Severe)
+                            <div class="text-muted small">เช่น SJS, TEN, DRESS, AGEP, Anaphylaxis, Angioedema, Bronchospasm</div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Special Flowchart Options for NSAIDs -->
+                <div id="nsaidFlowchartSection" class="border p-3 rounded bg-light mb-3 d-none">
+                    <h6 class="fw-bold text-danger"><i class="fa-solid fa-network-wired me-1"></i>การประเมิน Traditional NSAIDs:</h6>
+                    <small class="text-muted d-block mb-2">มีอาการ Type 1 Immediate hypersensitivity (เช่น bronchospasm, anaphylaxis, angioedema) หรือไม่?</small>
+                    <select id="nsaidType1" class="form-select form-select-sm mb-2" onchange="calculateLocking()">
+                        <option value="no">ไม่ใช่ (อาการแพ้แบบอื่น)</option>
+                        <option value="yes">ใช่ (เกิดภายใน 24 ชม. หลังใช้ยา)</option>
+                    </select>
+
+                    <div id="nsaidRiskSection" class="mt-2">
+                        <small class="text-muted d-block mb-1">มีปัจจัยเสี่ยงดังต่อไปนี้อย่างน้อย 1 ข้อหรือไม่?</small>
+                        <ul class="small text-muted ps-3 mb-1">
+                            <li>1. แพ้ NSAIDs กลุ่มโครงสร้างอื่นแล้วมีอาการแบบเดียวกัน</li>
+                            <li>2. มี comorbidities (Asthma, Rhinosinusitis, Nasal polyps, Chronic urticaria)</li>
+                            <li>3. มีประวัติแพ้อื่นๆ (แพ้อาหาร, แพ้เกสร)</li>
+                        </ul>
+                        <select id="nsaidRisk" class="form-select form-select-sm" onchange="calculateLocking()">
+                            <option value="no">ไม่มีปัจจัยเสี่ยงข้างต้น</option>
+                            <option value="yes">มีปัจจัยเสี่ยงอย่างน้อย 1 ข้อ</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary w-100 mt-2" onclick="calculateLocking()"><i class="fa-solid fa-calculator me-1"></i> ประเมินการล็อกยา</button>
+            </div>
+        </div>
+
+        <!-- Result Section -->
+        <div class="col-md-7">
+            <div class="card card-custom p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0 text-danger"><i class="fa-solid fa-lock me-2"></i>2. ผลประเมินและแนวทางการล็อกยา</h5>
+                    <button class="btn btn-outline-secondary btn-sm no-print" onclick="window.print()"><i class="fa-solid fa-print me-1"></i> พิมพ์เอกสาร</button>
+                </div>
+
+                <div id="resultContent">
+                    <div class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-hand-pointer fa-3x mb-3 text-secondary"></i>
+                        <p>กรุณาค้นหาและเลือกตัวยาที่ต้องการประเมินทางด้านซ้ายมือ</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script>
+// ฐานข้อมูลตัวยาทั้งหมดอ้างอิงจากตารางแนวทางปฏิบัติ + สถานะการมีในคลัง รพ.วังสะพุง
+const refDrugsMaster = [
+  // Penicillins
+  { generic: "Penicillin V", name: "Penicillin V 250 mg tab", inHosp: true, group: "Penicillins", subgroup: "Penicillins", r1: "R1 Group 1", r2: null },
+  { generic: "Penicillin G", name: "BENZATHINE PENICILLIN G 1.2 MU", inHosp: true, group: "Penicillins", subgroup: "Penicillins", r1: "R1 Group 2", r2: null },
+  { generic: "Amoxicillin", name: "Amoxicillin 500 mg cap", inHosp: true, group: "Penicillins", subgroup: "Penicillins", r1: "R1 Group 1", r2: null },
+  { generic: "Ampicillin", name: "AMPICILLIN inj. 1 g", inHosp: true, group: "Penicillins", subgroup: "Penicillins", r1: "R1 Group 1", r2: null },
+  { generic: "Piperacillin", name: "TAZOCIN 4.5 g inj", inHosp: true, group: "Penicillins", subgroup: "Penicillins", r1: "R1 Group 1", r2: null },
+  { generic: "Amoxicillin + Clavulanate", name: "AUGMENTIN 1.2 g inj", inHosp: true, group: "Penicillins", subgroup: "Penicillins + Beta-lactamase inhibitor", r1: "R1 Group 1", r2: null },
+  { generic: "Ampicillin + Sulbactam", name: "Unasyn inj", inHosp: false, group: "Penicillins", subgroup: "Penicillins + Beta-lactamase inhibitor", r1: "R1 Group 1", r2: null },
+  { generic: "Cloxacillin", name: "Cloxacillin 500 mg cap", inHosp: true, group: "Penicillins", subgroup: "Penicillins", r1: "Other Penicillins", r2: null },
+  { generic: "Dicloxacillin", name: "Dicloxacillin 250 mg cap", inHosp: true, group: "Penicillins", subgroup: "Penicillins", r1: "Other Penicillins", r2: null },
+  { generic: "Piperacillin + Tazobactam", name: "TAZOCIN 4.5 g inj", inHosp: true, group: "Penicillins", subgroup: "Penicillins + Beta-lactamase inhibitor", r1: "R1 Group 1", r2: null },
+
+  // Cephalosporins
+  { generic: "Cephalexin", name: "CEPHALEXIN 500 mg cap", inHosp: true, group: "Cephalosporins", subgroup: "Gen 1 Cephalosporin", r1: "R1 Group 1", r2: "R2 Group 1" },
+  { generic: "Cefaclor", name: "Cefaclor", inHosp: false, group: "Cephalosporins", subgroup: "Gen 2 Cephalosporin", r1: "R1 Group 1", r2: "Other R2" },
+  { generic: "Cephradine", name: "Cephradine", inHosp: false, group: "Cephalosporins", subgroup: "Gen 1 Cephalosporin", r1: "R1 Group 1", r2: "R2 Group 1" },
+  { generic: "Cefadroxil", name: "Cefadroxil", inHosp: false, group: "Cephalosporins", subgroup: "Gen 1 Cephalosporin", r1: "R1 Group 1", r2: "R2 Group 1" },
+  { generic: "Cefoxitin", name: "Cefoxitin", inHosp: false, group: "Cephalosporins", subgroup: "Gen 2 Cephalosporin", r1: "R1 Group 2", r2: "R2 Group 7" },
+  { generic: "Cephalothin", name: "Cephalothin", inHosp: false, group: "Cephalosporins", subgroup: "Gen 1 Cephalosporin", r1: "R1 Group 2", r2: "R2 Group 4" },
+  { generic: "Ceftriaxone", name: "(IM) - Ceftriaxone 1 g inj", inHosp: true, group: "Cephalosporins", subgroup: "Gen 3 Cephalosporin", r1: "R1 Group 3", r2: "Other R2" },
+  { generic: "Cefotaxime", name: "Cefo-TAXIME 1 g inj", inHosp: true, group: "Cephalosporins", subgroup: "Gen 3 Cephalosporin", r1: "R1 Group 3", r2: "R2 Group 4" },
+  { generic: "Cefepime", name: "Cefepime", inHosp: false, group: "Cephalosporins", subgroup: "Gen 4 Cephalosporin", r1: "R1 Group 3", r2: "Other R2" },
+  { generic: "Cefditoren", name: "Cefditoren", inHosp: false, group: "Cephalosporins", subgroup: "Gen 3 Cephalosporin", r1: "R1 Group 3", r2: "Other R2" },
+  { generic: "Ceftazidime", name: "CEFTAZIDIME 1 g inj", inHosp: true, group: "Cephalosporins", subgroup: "Gen 3 Cephalosporin", r1: "R1 Group 3", r2: "R2 Group 5" },
+  { generic: "Ceftizoxime", name: "Ceftizoxime", inHosp: false, group: "Cephalosporins", subgroup: "Gen 3 Cephalosporin", r1: "R1 Group 3", r2: "R2 Group 8" },
+  { generic: "Cefpirome", name: "Cefpirome 1 g inj", inHosp: true, group: "Cephalosporins", subgroup: "Gen 4 Cephalosporin", r1: "R1 Group 3", r2: "R2 Group 5" },
+  { generic: "Ceftaroline", name: "Ceftaroline", inHosp: false, group: "Cephalosporins", subgroup: "Gen 5 Cephalosporin", r1: "R1 Group 3", r2: "Other R2" },
+  { generic: "Ceftolozane", name: "Ceftolozane", inHosp: false, group: "Cephalosporins", subgroup: "Cephalosporin", r1: "R1 Group 3", r2: "Other R2" },
+  { generic: "Ceftobiprole", name: "Ceftobiprole", inHosp: false, group: "Cephalosporins", subgroup: "Cephalosporin", r1: "R1 Group 3", r2: "Other R2" },
+  { generic: "Cefuroxime", name: "Cefuroxime", inHosp: false, group: "Cephalosporins", subgroup: "Gen 2 Cephalosporin", r1: "R1 Group 3", r2: "R2 Group 7" },
+  { generic: "Cefazolin", name: "CEFAZOLIN 1 g inj", inHosp: true, group: "Cephalosporins", subgroup: "Gen 1 Cephalosporin", r1: "Other R1", r2: "R2 Group 2" },
+  { generic: "Cefdinir", name: "Cefdinir 100 mg tab", inHosp: true, group: "Cephalosporins", subgroup: "Gen 3 Cephalosporin", r1: "Other R1", r2: "R2 Group 3" },
+  { generic: "Cefixime", name: "CEFIXIME 100 mg cap", inHosp: true, group: "Cephalosporins", subgroup: "Gen 3 Cephalosporin", r1: "Other R1", r2: "R2 Group 3" },
+  { generic: "Cefoperazone", name: "SULPERAZONE 1 g inj", inHosp: true, group: "Cephalosporins", subgroup: "Gen 3 Cephalosporin", r1: "Other R1", r2: "R2 Group 6" },
+
+  // Carbapenems
+  { generic: "Imipenem", name: "Imipenem", inHosp: false, group: "Carbapenems", subgroup: "Carbapenem Group 1", r1: null, r2: null },
+  { generic: "Meropenem", name: "MEROPENEM 1 g inj", inHosp: true, group: "Carbapenems", subgroup: "Carbapenem Group 2", r1: null, r2: null },
+  { generic: "Ertapenem", name: "Ertapenem", inHosp: false, group: "Carbapenems", subgroup: "Carbapenem Group 2", r1: null, r2: null },
+  { generic: "Doripenem", name: "Doripenem", inHosp: false, group: "Carbapenems", subgroup: "Carbapenem Group 2", r1: null, r2: null },
+
+  // Sulfonamides
+  { generic: "Sulfamethoxazole", name: "CO-TRIMOXAZOLE 400/80 mg tab", inHosp: true, group: "Sulfonamides", subgroup: "Antibiotics (Arylamine)", r1: null, r2: null },
+  { generic: "Sulfadiazine", name: "SILVER SULFADIAZINE cream", inHosp: true, group: "Sulfonamides", subgroup: "Antibiotics (Arylamine)", r1: null, r2: null },
+  { generic: "Sulfacetamide", name: "Sulfacetamide", inHosp: false, group: "Sulfonamides", subgroup: "Antibiotics (Arylamine)", r1: null, r2: null },
+  { generic: "Sulfasalazine", name: "SULFASALAZINE 500 mg tab", inHosp: true, group: "Sulfonamides", subgroup: "Antibiotics (Arylamine)", r1: null, r2: null },
+  { generic: "Dapsone", name: "DAPSONE 100 mg tab", inHosp: true, group: "Sulfonamides", subgroup: "Antibiotics (Arylamine)", r1: null, r2: null },
+  { generic: "Furosemide", name: "FUROSEMIDE 40 mg tab", inHosp: true, group: "Sulfonamides", subgroup: "Non-antibiotics", r1: null, r2: null },
+  { generic: "Glibenclamide", name: "Glibenclamide 5 mg tab", inHosp: true, group: "Sulfonamides", subgroup: "Non-antibiotics", r1: null, r2: null },
+  { generic: "Gliclazide", name: "GliCLAZIDE 80 mg tab", inHosp: true, group: "Sulfonamides", subgroup: "Non-antibiotics", r1: null, r2: null },
+  { generic: "Glipizide", name: "GLIPIZIDE 5 mg tab", inHosp: true, group: "Sulfonamides", subgroup: "Non-antibiotics", r1: null, r2: null },
+  { generic: "Hydrochlorothiazide", name: "HCTZ 25 mg tab", inHosp: true, group: "Sulfonamides", subgroup: "Non-antibiotics", r1: null, r2: null },
+  { generic: "Probenacid", name: "Probenacid", inHosp: false, group: "Sulfonamides", subgroup: "Non-antibiotics", r1: null, r2: null },
+
+  // NSAIDs
+  { generic: "Aspirin", name: "ASPIRIN 81 mg tab", inHosp: true, group: "NSAIDs", subgroup: "Salicylates", r1: null, r2: null },
+  { generic: "Ibuprofen", name: "IBUPROFEN 400 mg tab", inHosp: true, group: "NSAIDs", subgroup: "Propionic acid derivatives", r1: null, r2: null },
+  { generic: "Naproxen", name: "NaproXEN 250 mg tab", inHosp: true, group: "NSAIDs", subgroup: "Propionic acid derivatives", r1: null, r2: null },
+  { generic: "Diclofenac", name: "DICLOFENAC 25 mg tab", inHosp: true, group: "NSAIDs", subgroup: "Acetic acid derivatives", r1: null, r2: null },
+  { generic: "Indomethacin", name: "INDOMETHACIN 25 mg cap", inHosp: true, group: "NSAIDs", subgroup: "Acetic acid derivatives", r1: null, r2: null },
+  { generic: "Piroxicam", name: "PIROXICAM 10 mg tab", inHosp: true, group: "NSAIDs", subgroup: "Enolic acid (Oxicam) derivatives", r1: null, r2: null },
+  { generic: "Meloxicam", name: "MELOXICAM 7.5 mg tab", inHosp: true, group: "NSAIDs", subgroup: "Enolic acid (Oxicam) derivatives", r1: null, r2: null },
+  { generic: "Mefenamic acid", name: "MEFEnamic Acid 500 mg tab", inHosp: true, group: "NSAIDs", subgroup: "Fenamic acid derivatives", r1: null, r2: null },
+  { generic: "Celecoxib", name: "Celebrex 200 mg cap", inHosp: true, group: "NSAIDs", subgroup: "Selective Cox-2 inhibitors (Coxibs)", r1: null, r2: null },
+  { generic: "Etoricoxib", name: "ARCOXIA 60 mg tab", inHosp: true, group: "NSAIDs", subgroup: "Selective Cox-2 inhibitors (Coxibs)", r1: null, r2: null },
+  { generic: "Ketoprofen", name: "Ketoprofen", inHosp: false, group: "NSAIDs", subgroup: "Propionic acid derivatives", r1: null, r2: null },
+  { generic: "Parecoxib", name: "Parecoxib", inHosp: false, group: "NSAIDs", subgroup: "Selective Cox-2 inhibitors (Coxibs)", r1: null, r2: null },
+
+  // Opioids
+  { generic: "Morphine", name: "Morphine MST 30 mg tab", inHosp: true, group: "Opioids", subgroup: "Phenanthrene", r1: null, r2: null },
+  { generic: "Codeine", name: "Codeine 15 mg tab", inHosp: true, group: "Opioids", subgroup: "Phenanthrene", r1: null, r2: null },
+  { generic: "Tramadol", name: "TRAMADOL 50 mg cap", inHosp: true, group: "Opioids", subgroup: "Phenylpropylamine", r1: null, r2: null },
+  { generic: "Fentanyl", name: "FentaNYL 100 mcg/2ml inj", inHosp: true, group: "Opioids", subgroup: "Phenylpiperidine", r1: null, r2: null },
+  { generic: "Pethidine", name: "PETHIDINE 50 mg/ml inj", inHosp: true, group: "Opioids", subgroup: "Phenylpiperidine", r1: null, r2: null },
+  { generic: "Nalbuphine", name: "Nalbuphine", inHosp: false, group: "Opioids", subgroup: "Phenanthrene", r1: null, r2: null },
+
+  // Fluoroquinolones
+  { generic: "Ciprofloxacin", name: "Ciprofloxacin 500 mg tab", inHosp: true, group: "Fluoroquinolones", subgroup: "Fluoroquinolones", r1: null, r2: null },
+  { generic: "Levofloxacin", name: "Levofloxacin 500 mg tab", inHosp: true, group: "Fluoroquinolones", subgroup: "Fluoroquinolones", r1: null, r2: null },
+  { generic: "Norfloxacin", name: "NorFLOXacin 200 mg tab", inHosp: true, group: "Fluoroquinolones", subgroup: "Fluoroquinolones", r1: null, r2: null },
+  { generic: "Ofloxacin", name: "Ofloxacin 100 mg tab", inHosp: true, group: "Fluoroquinolones", subgroup: "Fluoroquinolones", r1: null, r2: null },
+  { generic: "Moxifloxacin", name: "VIGAMOX ED 0.5%", inHosp: true, group: "Fluoroquinolones", subgroup: "Fluoroquinolones", r1: null, r2: null },
+
+  // Macrolides
+  { generic: "Azithromycin", name: "Azithromycin 250 mg cap", inHosp: true, group: "Macrolides", subgroup: "Macrolides", r1: null, r2: null },
+  { generic: "Clarithromycin", name: "CLARITHROMYCIN 500 mg tab", inHosp: true, group: "Macrolides", subgroup: "Macrolides", r1: null, r2: null },
+  { generic: "Erythromycin", name: "ERYTHROMYCIN 250 mg tab", inHosp: true, group: "Macrolides", subgroup: "Macrolides", r1: null, r2: null },
+  { generic: "Roxithromycin", name: "ROXITHROMYCIN 150 mg tab", inHosp: true, group: "Macrolides", subgroup: "Macrolides", r1: null, r2: null },
+
+  // PPIs
+  { generic: "Omeprazole", name: "OMEPRAZOLE 20 mg cap", inHosp: true, group: "Proton Pump Inhibitors", subgroup: "PPI", r1: null, r2: null },
+  { generic: "Lansoprazole", name: "Lansoprazole 30 mg tab", inHosp: true, group: "Proton Pump Inhibitors", subgroup: "PPI", r1: null, r2: null },
+  { generic: "Pantoprazole", name: "PANTOprazole inj 40 mg", inHosp: true, group: "Proton Pump Inhibitors", subgroup: "PPI", r1: null, r2: null },
+  { generic: "Esomeprazole", name: "Esomeprazole", inHosp: false, group: "Proton Pump Inhibitors", subgroup: "PPI", r1: null, r2: null }
+];
+
+let selectedDrug = null;
+
+function searchDrugs(query) {
+    const resBox = document.getElementById('searchResults');
+    if (!query || query.trim().length === 0) {
+        resBox.innerHTML = '';
+        return;
+    }
+    const q = query.toLowerCase().trim();
+
+    const filtered = refDrugsMaster.filter(d => 
+        (d.generic && d.generic.toLowerCase().includes(q)) || 
+        (d.name && d.name.toLowerCase().includes(q)) || 
+        (d.group && d.group.toLowerCase().includes(q)) ||
+        (d.subgroup && d.subgroup.toLowerCase().includes(q)) ||
+        (d.r1 && d.r1.toLowerCase().includes(q)) ||
+        (d.r2 && d.r2.toLowerCase().includes(q))
+    );
+
+    let html = '';
+    filtered.slice(0, 15).forEach(d => {
+        const badge = d.inHosp ? `<span class="badge-hosp-yes">มีใน รพ.วังสะพุง</span>` : `<span class="badge-hosp-no">ไม่มีใน รพ.</span>`;
+        html += `<a href="#" class="list-group-item list-group-item-action py-2" onclick="selectDrugByGeneric('${d.generic}'); return false;">
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-primary">${d.generic} <small class="text-secondary">(${d.name})</small></span>
+                ${badge}
+            </div>
+            <small class="text-muted d-block">
+                กลุ่มยา: <span class="text-danger fw-bold">${d.group}</span> ${d.subgroup ? '(' + d.subgroup + ')' : ''}
+            </small>
+        </a>`;
+    });
+
+    if (filtered.length === 0) {
+        html = `<div class="list-group-item text-muted small py-2"><i class="fa-solid fa-circle-exclamation me-1"></i> ไม่พบชื่อยาหรือกลุ่มยานี้ในระบบ</div>`;
+    }
+
+    resBox.innerHTML = html;
+}
+
+function selectDrugByGeneric(genericName) {
+    selectedDrug = refDrugsMaster.find(d => d.generic === genericName);
+    document.getElementById('searchResults').innerHTML = '';
+    document.getElementById('drugSearch').value = selectedDrug.generic;
+
+    const infoBox = document.getElementById('selectedDrugInfo');
+    infoBox.classList.remove('d-none');
+    
+    const hospBadge = selectedDrug.inHosp 
+        ? `<span class="badge-hosp-yes"><i class="fa-solid fa-check me-1"></i>มีใน รพ.วังสะพุง (${selectedDrug.name})</span>` 
+        : `<span class="badge-hosp-no"><i class="fa-solid fa-xmark me-1"></i>ไม่มีใน รพ.</span>`;
+
+    document.getElementById('selectedDrugTitle').innerHTML = `<span>${selectedDrug.generic}</span> ${hospBadge}`;
+    document.getElementById('selectedDrugDetail').innerText = `กลุ่มยา: ${selectedDrug.group} | โครงสร้างย่อย: ${selectedDrug.subgroup || '-'} ${selectedDrug.r1 ? '| ' + selectedDrug.r1 : ''}`;
+
+    if (selectedDrug.group === 'NSAIDs') {
+        document.getElementById('nsaidFlowchartSection').classList.remove('d-none');
+    } else {
+        document.getElementById('nsaidFlowchartSection').classList.add('d-none');
+    }
+
+    calculateLocking();
+}
+
+function quickSelect(genericName) {
+    selectDrugByGeneric(genericName);
+}
+
+function calculateLocking() {
+    if (!selectedDrug) return;
+
+    const severity = document.querySelector('input[name="severity"]:checked').value;
+    let lockTitle = '';
+    let lockDetails = [];
+    let affectedMasterDrugs = [];
+
+    // Decision Logic based on Nopparat Rajathanee Hospital Guideline
+    if (selectedDrug.group === 'Penicillins') {
+        if (severity === 'severe') {
+            lockTitle = 'ล็อกกลุ่ม <span class="text-danger fw-bold">Beta-lactams</span> ทั้งหมด';
+            lockDetails.push('คำแนะนำ: ล็อกยาในกลุ่ม <span class="text-danger fw-bold">Penicillins</span>, <span class="text-danger fw-bold">Cephalosporins</span> และ <span class="text-danger fw-bold">Carbapenems</span> ทุกชนิด');
+            affectedMasterDrugs = refDrugsMaster.filter(d => ['Penicillins', 'Cephalosporins', 'Carbapenems'].includes(d.group));
+        } else {
+            lockTitle = 'ล็อกกลุ่ม <span class="text-danger fw-bold">Penicillins</span> และ กลุ่มย่อย <span class="text-danger fw-bold">Cephalosporins (R1 Side Chain)</span>';
+            lockDetails.push('คำแนะนำ: ล็อกกลุ่ม <span class="text-danger fw-bold">Penicillins</span> ทุกชนิด');
+            if (selectedDrug.r1 === 'R1 Group 1') {
+                lockDetails.push('สายโซ่ข้าง <span class="text-danger fw-bold">R1 Group 1</span>: ให้ล็อก Cephalosporins กลุ่ม <span class="text-danger fw-bold">R1 Group 1</span> (เช่น Cephalexin, Cefadroxil)');
+                affectedMasterDrugs = refDrugsMaster.filter(d => d.group === 'Penicillins' || d.r1 === 'R1 Group 1');
+            } else {
+                affectedMasterDrugs = refDrugsMaster.filter(d => d.group === 'Penicillins');
+            }
+        }
+    } else if (selectedDrug.group === 'Cephalosporins') {
+        if (severity === 'severe') {
+            lockTitle = 'ล็อกกลุ่ม <span class="text-danger fw-bold">Beta-lactams</span> ทั้งหมด';
+            lockDetails.push('คำแนะนำ: ล็อกยาในกลุ่ม <span class="text-danger fw-bold">Penicillins</span>, <span class="text-danger fw-bold">Cephalosporins</span> และ <span class="text-danger fw-bold">Carbapenems</span> ทุกชนิด');
+            affectedMasterDrugs = refDrugsMaster.filter(d => ['Penicillins', 'Cephalosporins', 'Carbapenems'].includes(d.group));
+        } else {
+            lockTitle = 'ล็อกกลุ่มย่อย <span class="text-danger fw-bold">Cephalosporins</span> (ตาม R1 / R2 Side Chain)';
+            if (selectedDrug.r1) lockDetails.push(`ล็อกยาที่มีสายโซ่ข้าง R1 เดียวกัน (<span class="text-danger fw-bold">${selectedDrug.r1}</span>)`);
+            if (selectedDrug.r2) lockDetails.push(`ล็อกยาที่มีสายโซ่ข้าง R2 เดียวกัน (<span class="text-danger fw-bold">${selectedDrug.r2}</span>)`);
+            affectedMasterDrugs = refDrugsMaster.filter(d => d.group === 'Cephalosporins' && ((selectedDrug.r1 && d.r1 === selectedDrug.r1) || (selectedDrug.r2 && d.r2 === selectedDrug.r2)));
+        }
+    } else if (selectedDrug.group === 'Sulfonamides') {
+        if (selectedDrug.subgroup === 'Antibiotics (Arylamine)') {
+            lockTitle = 'ล็อกกลุ่ม <span class="text-danger fw-bold">Antibiotic Sulfonamides</span>';
+            lockDetails.push('คำแนะนำ: ล็อกยา <span class="text-danger fw-bold">Antibiotic Sulfonamide (Arylamine)</span> ทุกชนิด เช่น Co-trimoxazole, Sulfadiazine');
+            affectedMasterDrugs = refDrugsMaster.filter(d => d.subgroup === 'Antibiotics (Arylamine)');
+        } else {
+            lockTitle = 'ล็อกเฉพาะตัวยา <span class="text-danger fw-bold">Non-antibiotic Sulfonamide</span> ที่แพ้';
+            lockDetails.push('คำแนะนำ: ตรวจสอบประวัติการใช้ยาในอดีตก่อนล็อกกลุ่มยาเสมอ');
+            affectedMasterDrugs = [selectedDrug];
+        }
+    } else if (selectedDrug.group === 'NSAIDs') {
+        const isType1 = document.getElementById('nsaidType1').value === 'yes';
+        const hasRisk = document.getElementById('nsaidRisk').value === 'yes';
+
+        if (isType1 && hasRisk) {
+            lockTitle = 'ล็อก Traditional NSAIDs กลุ่มที่แพ้ (<span class="text-danger fw-bold">Suspected Pseudoallergy</span>)';
+            lockDetails.push(`ล็อกกลุ่มโครงสร้างย่อยที่แพ้ (เช่น <span class="text-danger fw-bold">${selectedDrug.subgroup}</span>)`);
+            affectedMasterDrugs = refDrugsMaster.filter(d => d.group === 'NSAIDs' && d.subgroup !== 'Selective Cox-2 inhibitors (Coxibs)');
+        } else if (severity === 'severe' && isType1) {
+            lockTitle = 'ล็อก NSAIDs กลุ่มใหญ่ (<span class="text-danger fw-bold">Non-steroidal anti-inflammatory drugs</span>)';
+            lockDetails.push('กรณีแพ้แบบ Severe type 1 hypersensitivity แนะนำล็อก NSAIDs ทุกกลุ่ม');
+            affectedMasterDrugs = refDrugsMaster.filter(d => d.group === 'NSAIDs');
+        } else {
+            lockTitle = `ล็อก NSAIDs กลุ่มโครงสร้างย่อยที่แพ้ (<span class="text-danger fw-bold">${selectedDrug.subgroup}</span>)`;
+            lockDetails.push(`ประเมินพบ: Suspected True Allergy แนะนำล็อกเฉพาะโครงสร้างย่อย (<span class="text-danger fw-bold">${selectedDrug.subgroup}</span>)`);
+            affectedMasterDrugs = refDrugsMaster.filter(d => d.subgroup === selectedDrug.subgroup);
+        }
+    } else {
+        lockTitle = `ล็อกยากลุ่ม <span class="text-danger fw-bold">${selectedDrug.group}</span>`;
+        lockDetails.push(`คำแนะนำ: ล็อกตัวยาและกลุ่มยา <span class="text-danger fw-bold">${selectedDrug.group}</span> ตามประวัติแพ้ยาของผู้ป่วย`);
+        affectedMasterDrugs = refDrugsMaster.filter(d => d.group === selectedDrug.group);
+    }
+
+    // Render Results
+    let hospListHtml = '';
+    affectedMasterDrugs.forEach(d => {
+        const hospBadge = d.inHosp 
+            ? `<span class="badge-hosp-yes">มีใน รพ.วังสะพุง</span>` 
+            : `<span class="badge-hosp-no">ไม่มีใน รพ.</span>`;
+
+        hospListHtml += `<li class="list-group-item d-flex justify-content-between align-items-center py-2">
+            <div>
+                <span class="fw-bold text-dark">${d.generic}</span>
+                <span class="text-muted small d-block">${d.inHosp ? 'ชื่อใน รพ: ' + d.name : 'ไม่มีรายการในคลัง รพ.วังสะพุง'}</span>
+            </div>
+            ${hospBadge}
+        </li>`;
+    });
+
+    const cleanLockTitle = lockTitle.replace(/<[^>]*>?/gm, '');
+    const cleanLockDetails = lockDetails.map(x => x.replace(/<[^>]*>?/gm, ''));
+
+    const emrSummaryText = `[บันทึกแพ้ยา รพ.วังสะพุง]
+ผู้ป่วยแจ้งแพ้/พบประวัติแพ้: ${selectedDrug.generic} (${selectedDrug.inHosp ? selectedDrug.name : 'ไม่มีใน รพ.'})
+ระดับความรุนแรง: ${severity === 'severe' ? 'Severe (รุนแรง)' : 'Non-severe (ไม่รุนแรง)'}
+คำแนะนำการล็อกยา: ${cleanLockTitle}
+รายละเอียด: ${cleanLockDetails.join(' | ')}
+รายการยาที่ได้รับผลกระทบ (${affectedMasterDrugs.length} รายการ): ${affectedMasterDrugs.map(x => x.generic + (x.inHosp ? ' [มีใน รพ.]' : ' [ไม่มีใน รพ.]')).join(', ')}`;
+
+    document.getElementById('resultContent').innerHTML = `
+        <div class="result-lock-box mb-3">
+            <h5 class="fw-bold text-danger mb-2"><i class="fa-solid fa-lock me-2"></i>${lockTitle}</h5>
+            <ul class="mb-0 text-secondary ps-3">
+                ${lockDetails.map(x => `<li>${x}</li>`).join('')}
+            </ul>
+        </div>
+
+        <div class="mb-3">
+            <h6 class="fw-bold text-secondary"><i class="fa-solid fa-boxes-stacked me-1"></i> รายการยาในกลุ่มที่ต้องเฝ้าระวัง/ล็อก (${affectedMasterDrugs.length} รายการ):</h6>
+            <ul class="list-group style-none shadow-sm" style="max-height: 250px; overflow-y: auto;">
+                ${hospListHtml}
+            </ul>
+        </div>
+
+        <div class="card p-3 bg-light border-0 no-print">
+            <div class="d-flex justify-content-between align-items-center">
+                <small class="fw-bold text-muted">ข้อความสรุปสำหรับคัดลอกลงระบบ HOSxP / EMR:</small>
+                <button class="btn btn-sm btn-outline-primary" onclick="copyEMRText()"><i class="fa-solid fa-copy me-1"></i> คัดลอกข้อความ</button>
+            </div>
+            <textarea id="emrTextArea" class="form-control form-control-sm mt-2" rows="3" readonly>${emrSummaryText}</textarea>
+        </div>
+    `;
+}
+
+function copyEMRText() {
+    const copyText = document.getElementById("emrTextArea");
+    copyText.select();
+    document.execCommand("copy");
+    alert("คัดลอกข้อความสรุปประวัติแพ้ยาเรียบร้อยแล้ว สามารถนำไปวางในระบบ HOSxP ได้ทันทีครับ");
+}
+</script>
+</body>
+</html>
